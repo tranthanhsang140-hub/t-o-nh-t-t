@@ -10,66 +10,67 @@ interface ResultDisplayProps {
 
 export const ResultDisplay: React.FC<ResultDisplayProps> = ({ original, result, isLoading, error }) => {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
-      {/* Original Image Card */}
-      <div className="bg-white rounded-3xl p-4 shadow-lg">
-        <h3 className="text-center font-bold text-red-800 mb-3 uppercase tracking-wider text-sm">Ảnh Gốc</h3>
-        <div className="relative aspect-[3/4] overflow-hidden rounded-2xl bg-gray-100">
+    <div className="bg-white rounded-3xl p-4 shadow-lg border border-gray-100 flex flex-col gap-4">
+      {/* Container for original/result */}
+      <div className="relative aspect-[3/4] overflow-hidden rounded-2xl bg-gray-100 group">
+        {!result && !isLoading && !error && (
           <img 
             src={original} 
             alt="Original" 
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover opacity-80"
           />
-        </div>
-      </div>
-
-      {/* Result Image Card */}
-      <div className="bg-white rounded-3xl p-4 shadow-lg border-2 border-yellow-200">
-        <h3 className="text-center font-bold text-red-800 mb-3 uppercase tracking-wider text-sm">
-          {result ? "Ảnh Tết Của Bạn ✨" : "Kết Quả AI"}
-        </h3>
+        )}
         
-        <div className="relative aspect-[3/4] overflow-hidden rounded-2xl bg-gray-100 flex items-center justify-center">
-          {isLoading ? (
-            <div className="flex flex-col items-center gap-4 p-8 text-center">
-              <div className="w-16 h-16 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
-              <div>
-                <p className="text-red-800 font-bold animate-pulse">Đang rắc hoa đào...</p>
-                <p className="text-xs text-gray-400 mt-2">Gemini 2.5 đang vẽ lại khoảnh khắc Tết của bạn</p>
-              </div>
-            </div>
-          ) : error ? (
-            <div className="p-8 text-center text-red-600">
-              <svg className="w-12 h-12 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-              <p className="font-medium">{error}</p>
-            </div>
-          ) : result ? (
-            <img 
-              src={result} 
-              alt="Transformed" 
-              className="w-full h-full object-cover animate-in fade-in zoom-in duration-500"
-            />
-          ) : (
-            <div className="text-center text-gray-300 p-8">
-              <p>Nhấn nút bên dưới để bắt đầu</p>
-            </div>
-          )}
-        </div>
-        
-        {result && !isLoading && (
-          <div className="mt-4">
-             <a 
-              href={result} 
-              download="anh-tet-cua-toi.png"
-              className="w-full block text-center bg-yellow-500 hover:bg-yellow-600 text-red-900 font-bold py-3 rounded-xl transition"
-            >
-              Tải Ảnh Về Máy
-            </a>
+        {isLoading && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center bg-red-50/80 backdrop-blur-sm">
+            <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
+            <p className="mt-4 text-red-800 font-bold animate-pulse text-sm">Đang vẽ phong vị Tết...</p>
           </div>
         )}
+
+        {error && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-red-50">
+            <svg className="w-10 h-10 text-red-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <p className="text-red-600 font-medium text-xs">{error}</p>
+          </div>
+        )}
+
+        {result && (
+          <img 
+            src={result} 
+            alt="Transformed" 
+            className="w-full h-full object-cover animate-in fade-in zoom-in duration-700"
+          />
+        )}
+
+        {/* Hover label */}
+        {!result && !isLoading && !error && (
+          <div className="absolute top-2 left-2 bg-black/50 text-white text-[10px] px-2 py-1 rounded-full">ẢNH CHỜ</div>
+        )}
       </div>
+      
+      {result && !isLoading && (
+        <div className="flex gap-2">
+           <a 
+            href={result} 
+            download={`anh-tet-${Date.now()}.png`}
+            className="flex-1 text-center bg-yellow-500 hover:bg-yellow-600 text-red-900 font-bold py-2 rounded-xl transition text-sm"
+          >
+            Tải Ảnh
+          </a>
+          <button 
+            onClick={() => {
+              const win = window.open();
+              win?.document.write(`<img src="${result}" style="width:100%"/>`);
+            }}
+            className="px-4 bg-gray-100 hover:bg-gray-200 rounded-xl transition"
+          >
+            👁️
+          </button>
+        </div>
+      )}
     </div>
   );
 };

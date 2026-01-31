@@ -2,235 +2,269 @@
 import React, { useState } from 'react';
 import { ImageUploader } from './components/ImageUploader';
 import { ResultDisplay } from './components/ResultDisplay';
-import { transformImageToTetStyle, FlowerType, SubjectType, AdvancedOptions, FramingType, CompanionType } from './services/geminiService';
+import { transformImageToTetStyle, FlowerType, SubjectType, AdvancedOptions, FramingType, CompanionType, LightingType } from './services/geminiService';
+
+export interface ImageItem {
+  id: string;
+  original: string;
+  transformed: string | null;
+  isLoading: boolean;
+  error: string | null;
+}
 
 const App: React.FC = () => {
-  const [originalImage, setOriginalImage] = useState<string | null>(null);
-  const [transformedImage, setTransformedImage] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [images, setImages] = useState<ImageItem[]>([]);
+  const [isProcessingBatch, setIsProcessingBatch] = useState(false);
+  const [mergedResult, setMergedResult] = useState<string | null>(null);
   
   const [flowerType, setFlowerType] = useState<FlowerType>('peach');
   const [subjectType, setSubjectType] = useState<SubjectType>('single');
 
   const [advancedOptions, setAdvancedOptions] = useState<AdvancedOptions>({
-    shirtColor: 'Màu đỏ (truyền thống)',
-    style: 'Áo dài truyền thống',
-    emotion: 'Vui tươi, rạng rỡ',
+    shirtColor: 'Áo dài đỏ rực rỡ',
+    style: 'Truyền thống sang trọng',
+    emotion: 'Rạng rỡ, hạnh phúc',
     aperture: 'f/1.4',
-    focalLength: '85mm',
-    cameraModel: 'Sony A7R V',
+    focalLength: '85mm Prime',
+    cameraModel: 'Sony A7R V (Full-frame)',
     framing: 'portrait',
-    skinColor: 'Trắng sáng hồng hào',
-    hairColor: 'Đen tự nhiên',
-    companion: 'none'
+    skinColor: 'Trắng hồng tự nhiên',
+    hairColor: 'Đen mượt',
+    companion: 'none',
+    lighting: 'Golden Hour',
+    isMergeMode: false
   });
 
-  const handleImageUpload = (base64: string) => {
-    setOriginalImage(base64);
-    setTransformedImage(null);
-    setError(null);
+  const handleImagesUpload = (base64Array: string[]) => {
+    const newItems: ImageItem[] = base64Array.map((base64, index) => ({
+      id: `${Date.now()}-${index}`,
+      original: base64,
+      transformed: null,
+      isLoading: false,
+      error: null
+    }));
+    setImages(newItems);
+    setMergedResult(null);
   };
 
-  const handleTransform = async () => {
-    if (!originalImage) return;
-
-    setIsLoading(true);
-    setError(null);
-    try {
-      const result = await transformImageToTetStyle(originalImage, flowerType, subjectType, advancedOptions);
-      if (result) {
-        setTransformedImage(result);
-      } else {
-        setError("Không thể tạo ảnh. Vui lòng thử lại.");
+  const processBatch = async () => {
+    setIsProcessingBatch(true);
+    
+    if (advancedOptions.isMergeMode) {
+      // Merge all uploaded images into one
+      try {
+        const originals = images.map(img => img.original);
+        const result = await transformImageToTetStyle(originals, flowerType, subjectType, advancedOptions);
+        setMergedResult(result);
+      } catch (err) {
+        alert("Lỗi khi ghép ảnh. Vui lòng thử lại.");
       }
-    } catch (err) {
-      console.error(err);
-      setError("Đã xảy ra lỗi trong quá trình xử lý ảnh. Hãy chắc chắn rằng bạn đang sử dụng API Key hợp lệ.");
-    } finally {
-      setIsLoading(false);
+    } else {
+      // Process images one by one
+      for (const img of images) {
+        if (!img.transformed) {
+          setImages(prev => prev.map(i => i.id === img.id ? { ...i, isLoading: true, error: null } : i));
+          try {
+            const result = await transformImageToTetStyle(img.original, flowerType, subjectType, advancedOptions);
+            setImages(prev => prev.map(i => i.id === img.id ? { ...i, transformed: result, isLoading: false } : i));
+          } catch (err) {
+            setImages(prev => prev.map(i => i.id === img.id ? { ...i, isLoading: false, error: "Lỗi AI" } : i));
+          }
+        }
+      }
     }
+    setIsProcessingBatch(false);
   };
 
   const handleReset = () => {
-    setOriginalImage(null);
-    setTransformedImage(null);
-    setError(null);
+    setImages([]);
+    setMergedResult(null);
+    setIsProcessingBatch(false);
   };
 
-  const updateAdvanced = (key: keyof AdvancedOptions, value: string) => {
+  const updateAdvanced = (key: keyof AdvancedOptions, value: any) => {
     setAdvancedOptions(prev => ({ ...prev, [key]: value }));
   };
 
   return (
-    <div className="min-h-screen bg-red-50 text-gray-900 pb-20">
-      <header className="bg-red-700 text-white py-8 px-4 shadow-lg text-center relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
-          <div className="absolute top-0 left-0 text-6xl">🌸</div>
-          <div className="absolute top-10 right-10 text-6xl">🏮</div>
-          <div className="absolute bottom-5 left-20 text-4xl">🧧</div>
+    <div className="min-h-screen bg-[#fef2f2] text-gray-900 pb-20">
+      <header className="bg-[#b91c1c] text-white py-10 px-4 shadow-2xl text-center relative overflow-hidden">
+        <div className="absolute inset-0 opacity-10 pointer-events-none flex flex-wrap justify-around items-center">
+          {[...Array(20)].map((_, i) => (
+            <span key={i} className="text-4xl">🌸</span>
+          ))}
         </div>
-        <h1 className="text-4xl md:text-6xl font-festive mb-2 relative z-10">Tết Photo Magic</h1>
-        <p className="text-red-100 max-w-2xl mx-auto opacity-90">
-          Studio ảnh Tết AI: Tùy chỉnh bối cảnh, nhân vật và phong cách nhiếp ảnh đỉnh cao.
+        <h1 className="text-5xl md:text-7xl font-festive mb-4 relative z-10 drop-shadow-lg">Tết Photo Studio Pro</h1>
+        <p className="text-red-100 max-w-2xl mx-auto opacity-90 text-lg">
+          Nâng tầm ảnh Tết với thông số máy ảnh chuyên nghiệp và công nghệ AI ghép ảnh tối tân.
         </p>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 mt-8 space-y-8">
-        {!originalImage ? (
-          <ImageUploader onUpload={handleImageUpload} />
+      <main className="max-w-7xl mx-auto px-4 mt-8 space-y-10">
+        {images.length === 0 ? (
+          <ImageUploader onUpload={handleImagesUpload} />
         ) : (
-          <div className="space-y-6">
-            {!transformedImage && !isLoading && (
-              <div className="bg-white p-6 md:p-8 rounded-3xl shadow-xl border border-red-100 space-y-8 animate-in fade-in slide-in-from-top-4">
-                {/* Basic Section */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="space-y-8">
+            {/* Professional Settings Panel */}
+            <div className="bg-white p-8 rounded-[2rem] shadow-2xl border border-red-100 animate-in fade-in slide-in-from-top-6">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-red-50 pb-6 mb-8 gap-4">
+                <div>
+                  <h3 className="text-2xl font-bold text-red-800">Studio Configuration</h3>
+                  <p className="text-sm text-gray-500">Thiết lập thông số cho {images.length} tệp ảnh</p>
+                </div>
+                <div className="flex items-center gap-4 bg-red-50 p-2 rounded-2xl">
+                   <span className="text-sm font-bold text-red-800 ml-2">Chế độ Ghép Ảnh (Merge):</span>
+                   <button 
+                    onClick={() => updateAdvanced('isMergeMode', !advancedOptions.isMergeMode)}
+                    className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors focus:outline-none ${advancedOptions.isMergeMode ? 'bg-red-600' : 'bg-gray-300'}`}
+                   >
+                     <span className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${advancedOptions.isMergeMode ? 'translate-x-7' : 'translate-x-1'}`} />
+                   </button>
+                </div>
+              </div>
+
+              {/* Grid of Controls */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                {/* Visual Settings */}
+                <div className="space-y-4">
+                  <h4 className="text-xs font-black text-red-700 uppercase tracking-widest border-l-4 border-red-600 pl-2">Cảnh quan</h4>
                   <div>
-                    <label className="block text-red-800 font-bold mb-3 flex items-center gap-2">
-                      <span>🌼</span> Vườn hoa:
-                    </label>
-                    <div className="flex gap-2">
-                      <button onClick={() => setFlowerType('peach')} className={`flex-1 py-3 px-2 rounded-xl text-sm font-semibold transition ${flowerType === 'peach' ? 'bg-red-600 text-white shadow-lg' : 'bg-red-50 text-red-600'}`}>🌸 Đào</button>
-                      <button onClick={() => setFlowerType('apricot')} className={`flex-1 py-3 px-2 rounded-xl text-sm font-semibold transition ${flowerType === 'apricot' ? 'bg-yellow-500 text-white shadow-lg' : 'bg-yellow-50 text-yellow-700'}`}>🌼 Mai</button>
+                    <label className="block text-xs font-bold text-gray-400 mb-1">Vườn hoa:</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button onClick={() => setFlowerType('peach')} className={`py-2 rounded-lg text-xs font-bold ${flowerType === 'peach' ? 'bg-red-600 text-white' : 'bg-gray-100'}`}>🌸 Đào Bắc</button>
+                      <button onClick={() => setFlowerType('apricot')} className={`py-2 rounded-lg text-xs font-bold ${flowerType === 'apricot' ? 'bg-yellow-500 text-white' : 'bg-gray-100'}`}>🌼 Mai Nam</button>
                     </div>
                   </div>
                   <div>
-                    <label className="block text-red-800 font-bold mb-3 flex items-center gap-2">
-                      <span>👥</span> Chủ thể:
-                    </label>
-                    <div className="flex gap-2">
-                      <button onClick={() => setSubjectType('single')} className={`flex-1 py-3 px-2 rounded-xl text-sm font-semibold transition ${subjectType === 'single' ? 'bg-red-600 text-white shadow-lg' : 'bg-red-50 text-red-600'}`}>👤 Một người</button>
-                      <button onClick={() => setSubjectType('group')} className={`flex-1 py-3 px-2 rounded-xl text-sm font-semibold transition ${subjectType === 'group' ? 'bg-red-600 text-white shadow-lg' : 'bg-red-50 text-red-600'}`}>👨‍👩‍👧 Nhóm</button>
-                    </div>
+                    <label className="block text-xs font-bold text-gray-400 mb-1">Ánh sáng (Lighting):</label>
+                    <select className="w-full bg-gray-50 border border-gray-100 rounded-lg p-2 text-sm" value={advancedOptions.lighting} onChange={e => updateAdvanced('lighting', e.target.value)}>
+                      <option>Golden Hour</option>
+                      <option>Soft Morning</option>
+                      <option>Cinematic</option>
+                      <option>Studio</option>
+                      <option>Vintage Warm</option>
+                    </select>
                   </div>
+                </div>
+
+                {/* Technical Settings */}
+                <div className="space-y-4">
+                  <h4 className="text-xs font-black text-red-700 uppercase tracking-widest border-l-4 border-red-600 pl-2">Thông số máy</h4>
                   <div>
-                    <label className="block text-red-800 font-bold mb-3 flex items-center gap-2">
-                      <span>📸</span> Góc chụp:
-                    </label>
-                    <div className="flex gap-2">
-                      <button onClick={() => updateAdvanced('framing', 'full-body')} className={`flex-1 py-3 px-1 rounded-xl text-xs font-semibold transition ${advancedOptions.framing === 'full-body' ? 'bg-blue-600 text-white shadow-lg' : 'bg-blue-50 text-blue-600'}`}>Toàn thân</button>
-                      <button onClick={() => updateAdvanced('framing', 'portrait')} className={`flex-1 py-3 px-1 rounded-xl text-xs font-semibold transition ${advancedOptions.framing === 'portrait' ? 'bg-blue-600 text-white shadow-lg' : 'bg-blue-50 text-blue-600'}`}>Chân dung</button>
-                      <button onClick={() => updateAdvanced('framing', 'close-up')} className={`flex-1 py-3 px-1 rounded-xl text-xs font-semibold transition ${advancedOptions.framing === 'close-up' ? 'bg-blue-600 text-white shadow-lg' : 'bg-blue-50 text-blue-600'}`}>Cận mặt</button>
+                    <label className="block text-xs font-bold text-gray-400 mb-1">Dòng máy (Body):</label>
+                    <select className="w-full bg-gray-50 border border-gray-100 rounded-lg p-2 text-sm" value={advancedOptions.cameraModel} onChange={e => updateAdvanced('cameraModel', e.target.value)}>
+                      <option>Sony A7R V (Full-frame)</option>
+                      <option>Canon EOS R5</option>
+                      <option>Nikon Z9</option>
+                      <option>Fujifilm GFX100 (Medium Format)</option>
+                      <option>Leica M11</option>
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 mb-1">Tiêu cự (Lens):</label>
+                      <select className="w-full bg-gray-50 border border-gray-100 rounded-lg p-2 text-sm" value={advancedOptions.focalLength} onChange={e => updateAdvanced('focalLength', e.target.value)}>
+                        <option>35mm Wide</option>
+                        <option>50mm Standard</option>
+                        <option>85mm Prime</option>
+                        <option>135mm Tele</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 mb-1">Khẩu độ (Aper):</label>
+                      <select className="w-full bg-gray-50 border border-gray-100 rounded-lg p-2 text-sm" value={advancedOptions.aperture} onChange={e => updateAdvanced('aperture', e.target.value)}>
+                        <option>f/0.95</option>
+                        <option>f/1.2</option>
+                        <option>f/1.4</option>
+                        <option>f/1.8</option>
+                        <option>f/2.8</option>
+                      </select>
                     </div>
                   </div>
                 </div>
 
-                {/* Advanced Customization Section */}
-                <div className="border-t border-red-50 pt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                  <div className="lg:col-span-4">
-                    <h3 className="text-xl font-bold text-red-800 mb-4 flex items-center gap-2"><span>⚙️</span> Tùy chỉnh chi tiết:</h3>
-                  </div>
-
+                {/* Subject Settings */}
+                <div className="space-y-4">
+                  <h4 className="text-xs font-black text-red-700 uppercase tracking-widest border-l-4 border-red-600 pl-2">Nhân vật</h4>
                   <div>
-                    <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-tight">Màu da:</label>
-                    <select className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 outline-none focus:ring-2 focus:ring-red-500" value={advancedOptions.skinColor} onChange={(e) => updateAdvanced('skinColor', e.target.value)}>
-                      <option>Trắng sáng hồng hào</option>
-                      <option>Tự nhiên</option>
-                      <option>Rám nắng khỏe khoắn</option>
-                      <option>Giữ nguyên ảnh gốc</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-tight">Màu tóc:</label>
-                    <select className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 outline-none focus:ring-2 focus:ring-red-500" value={advancedOptions.hairColor} onChange={(e) => updateAdvanced('hairColor', e.target.value)}>
-                      <option>Đen tự nhiên</option>
-                      <option>Nâu hạt dẻ</option>
-                      <option>Nâu tây</option>
-                      <option>Bạch kim</option>
-                      <option>Giữ nguyên ảnh gốc</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-tight">Bạn đồng hành (AI):</label>
-                    <select className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 outline-none focus:ring-2 focus:ring-red-500" value={advancedOptions.companion} onChange={(e) => updateAdvanced('companion', e.target.value)}>
-                      <option value="none">Không thêm</option>
-                      <option value="male">Thêm một bạn nam</option>
-                      <option value="female">Thêm một bạn nữ</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-tight">Trang phục:</label>
-                    <select className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 outline-none focus:ring-2 focus:ring-red-500" value={advancedOptions.shirtColor} onChange={(e) => updateAdvanced('shirtColor', e.target.value)}>
-                      <option>Áo dài đỏ truyền thống</option>
-                      <option>Áo dài vàng hoàng kim</option>
-                      <option>Áo dài xanh ngọc</option>
-                      <option>Trang phục hiện đại</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-tight">Khẩu độ (Aperture):</label>
-                    <select className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 outline-none focus:ring-2 focus:ring-red-500" value={advancedOptions.aperture} onChange={(e) => updateAdvanced('aperture', e.target.value)}>
-                      <option>f/1.2 (Siêu xóa phông)</option>
-                      <option>f/1.4 (Chuyên nghiệp)</option>
-                      <option>f/2.8 (Vừa phải)</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-tight">Tiêu cự (Lens):</label>
-                    <select className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 outline-none focus:ring-2 focus:ring-red-500" value={advancedOptions.focalLength} onChange={(e) => updateAdvanced('focalLength', e.target.value)}>
-                      <option>85mm (Chân dung)</option>
-                      <option>50mm (Tự nhiên)</option>
-                      <option>135mm (Nén phông)</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-tight">Dòng máy:</label>
-                    <select className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 outline-none focus:ring-2 focus:ring-red-500" value={advancedOptions.cameraModel} onChange={(e) => updateAdvanced('cameraModel', e.target.value)}>
-                      <option>Sony A7R V</option>
-                      <option>Canon EOS R5</option>
-                      <option>Fujifilm GFX100</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-tight">Cảm xúc:</label>
-                    <select className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 outline-none focus:ring-2 focus:ring-red-500" value={advancedOptions.emotion} onChange={(e) => updateAdvanced('emotion', e.target.value)}>
+                    <label className="block text-xs font-bold text-gray-400 mb-1">Cảm xúc:</label>
+                    <select className="w-full bg-gray-50 border border-gray-100 rounded-lg p-2 text-sm" value={advancedOptions.emotion} onChange={e => updateAdvanced('emotion', e.target.value)}>
                       <option>Rạng rỡ, hạnh phúc</option>
                       <option>Dịu dàng, đằm thắm</option>
-                      <option>Cá tính, sắc sảo</option>
+                      <option>Nostalgic (Hoài niệm)</option>
+                      <option>Elegant (Thanh lịch)</option>
+                      <option>Energetic (Sôi nổi)</option>
                     </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-400 mb-1">Trang phục:</label>
+                    <select className="w-full bg-gray-50 border border-gray-100 rounded-lg p-2 text-sm" value={advancedOptions.shirtColor} onChange={e => updateAdvanced('shirtColor', e.target.value)}>
+                      <option>Áo dài đỏ rực rỡ</option>
+                      <option>Áo dài vàng hoàng kim</option>
+                      <option>Áo dài xanh ngọc bích</option>
+                      <option>Áo dài trắng tinh khôi</option>
+                      <option>Áo ngũ thân truyền thống</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Framing Settings */}
+                <div className="space-y-4">
+                  <h4 className="text-xs font-black text-red-700 uppercase tracking-widest border-l-4 border-red-600 pl-2">Bố cục</h4>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-400 mb-1">Góc chụp:</label>
+                    <div className="grid grid-cols-1 gap-1">
+                      <button onClick={() => updateAdvanced('framing', 'portrait')} className={`py-1.5 rounded-lg text-[10px] font-bold ${advancedOptions.framing === 'portrait' ? 'bg-red-600 text-white' : 'bg-gray-100'}`}>CHÂN DUNG</button>
+                      <button onClick={() => updateAdvanced('framing', 'full-body')} className={`py-1.5 rounded-lg text-[10px] font-bold ${advancedOptions.framing === 'full-body' ? 'bg-red-600 text-white' : 'bg-gray-100'}`}>TOÀN THÂN</button>
+                      <button onClick={() => updateAdvanced('framing', 'close-up')} className={`py-1.5 rounded-lg text-[10px] font-bold ${advancedOptions.framing === 'close-up' ? 'bg-red-600 text-white' : 'bg-gray-100'}`}>CẬN MẶT</button>
+                    </div>
                   </div>
                 </div>
               </div>
-            )}
 
-            <ResultDisplay 
-              original={originalImage} 
-              result={transformedImage} 
-              isLoading={isLoading} 
-              error={error}
-            />
-            
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-              {!transformedImage && !isLoading && (
+              <div className="flex flex-col items-center gap-4 mt-12">
                 <button
-                  onClick={handleTransform}
-                  className={`font-bold py-4 px-12 rounded-full shadow-2xl transform transition hover:scale-105 active:scale-95 flex items-center gap-2 text-xl ${flowerType === 'peach' ? 'bg-red-600 text-white' : 'bg-yellow-500 text-red-900'}`}
+                  onClick={processBatch}
+                  disabled={isProcessingBatch}
+                  className={`group relative overflow-hidden font-bold py-5 px-20 rounded-full shadow-2xl transition-all hover:scale-105 active:scale-95 text-2xl ${isProcessingBatch ? 'bg-gray-400 cursor-not-allowed' : 'bg-gradient-to-r from-red-600 to-red-800 text-white'}`}
                 >
-                  🚀 Tạo Ảnh Tết Ngay
+                  <span className="relative z-10">{isProcessingBatch ? 'Đang Xử Lý...' : '🚀 BẮT ĐẦU CHỤP ẢNH'}</span>
+                  {!isProcessingBatch && <div className="absolute inset-0 bg-white/20 transform -translate-x-full group-hover:translate-x-full transition-transform duration-700" />}
                 </button>
-              )}
-              
-              {(transformedImage || (!isLoading && originalImage)) && (
-                <button onClick={handleReset} className="bg-white border-2 border-red-700 text-red-700 hover:bg-red-50 font-semibold py-3 px-8 rounded-full transition">Chọn Ảnh Khác</button>
-              )}
-
-              {transformedImage && !isLoading && (
-                <button onClick={handleTransform} className="bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-8 rounded-full transition flex items-center gap-2">🔄 Thử Mẫu Khác</button>
-              )}
+                <button onClick={handleReset} className="text-red-700 font-bold underline text-sm">Hủy bỏ và làm lại</button>
+              </div>
             </div>
+
+            {/* Results Section */}
+            {advancedOptions.isMergeMode && mergedResult ? (
+              <div className="max-w-3xl mx-auto">
+                <h3 className="text-center text-2xl font-bold text-red-800 mb-6 italic">Tác phẩm Ghép Ảnh Sum Vầy</h3>
+                <ResultDisplay 
+                  original={images[0].original} 
+                  result={mergedResult} 
+                  isLoading={isProcessingBatch} 
+                  error={null}
+                />
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {images.map((img) => (
+                  <ResultDisplay 
+                    key={img.id}
+                    original={img.original} 
+                    result={img.transformed} 
+                    isLoading={img.isLoading} 
+                    error={img.error}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         )}
       </main>
 
       <footer className="fixed bottom-0 left-0 w-full bg-white/80 backdrop-blur-md border-t border-red-100 py-3 text-center text-red-800 text-sm font-medium z-50">
-        AI powered by Gemini 2.5 Flash Image 🌸 Chúc Mừng Năm Mới!
+        Professional AI Imaging • Powered by Gemini 2.5 • Happy Lunar New Year 🧧
       </footer>
     </div>
   );

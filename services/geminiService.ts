@@ -5,6 +5,7 @@ export type FlowerType = 'peach' | 'apricot';
 export type SubjectType = 'single' | 'group';
 export type FramingType = 'full-body' | 'portrait' | 'close-up';
 export type CompanionType = 'none' | 'male' | 'female';
+export type LightingType = 'Golden Hour' | 'Soft Morning' | 'Cinematic' | 'Studio' | 'Vintage Warm';
 
 export interface AdvancedOptions {
   shirtColor: string;
@@ -17,106 +18,88 @@ export interface AdvancedOptions {
   skinColor: string;
   hairColor: string;
   companion: CompanionType;
+  lighting: LightingType;
+  isMergeMode: boolean;
 }
 
 /**
- * Transforms an image into a Tet-themed portrait using Gemini 2.5 Flash Image.
+ * Transforms one or more images into a Tet-themed portrait.
  */
 export const transformImageToTetStyle = async (
-  base64Image: string, 
+  base64Images: string | string[], 
   flowerType: FlowerType = 'peach',
   subjectType: SubjectType = 'single',
-  advanced?: AdvancedOptions
+  advanced: AdvancedOptions
 ): Promise<string | null> => {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
-    const dataOnly = base64Image.split(',')[1];
-    const mimeType = base64Image.split(',')[0].split(':')[1].split(';')[0];
-
-    const variations = [
-      "nắng chiều vàng nhẹ", 
-      "không khí sáng sớm tinh khôi", 
-      "bokeh lung linh từ đèn trang trí", 
-      "hơi sương mờ ảo mùa xuân"
-    ];
-    const randomVar = variations[Math.floor(Math.random() * variations.length)];
+    const imagesArray = Array.isArray(base64Images) ? base64Images : [base64Images];
+    
+    // Create image parts for the prompt
+    const imageParts = imagesArray.map(base64 => {
+      const dataOnly = base64.split(',')[1];
+      const mimeType = base64.split(',')[0].split(':')[1].split(';')[0];
+      return {
+        inlineData: {
+          data: dataOnly,
+          mimeType: mimeType,
+        }
+      };
+    });
 
     const flowerDescription = flowerType === 'peach' 
-      ? "trồng đầy hoa đào Nhật Tân (Hà Nội) rực rỡ sắc hồng" 
-      : "vườn mai vàng rực rỡ (miền Nam) khoe sắc vàng óng";
+      ? "vườn đào Nhật Tân rực rỡ sắc hồng thắm" 
+      : "vườn mai vàng phương Nam rực rỡ nắng xuân";
     
-    const colorsDescription = flowerType === 'peach'
-      ? "Tông màu: Hồng, đỏ, xanh lá mạ."
-      : "Tông màu: Vàng rực, đỏ, xanh tươi.";
+    const framingDesc = advanced.framing === 'full-body' ? "lấy toàn thân (full body shot)" : 
+                       advanced.framing === 'close-up' ? "chụp cận mặt (extreme close-up)" : 
+                       "chụp chân dung nghệ thuật (waist-up portrait)";
 
-    const adv = advanced || {
-      shirtColor: 'Màu đỏ',
-      style: 'Áo dài',
-      emotion: 'Vui vẻ',
-      aperture: 'f/1.4',
-      focalLength: '85mm',
-      cameraModel: 'Sony A7R V',
-      framing: 'portrait',
-      skinColor: 'Tự nhiên',
-      hairColor: 'Đen',
-      companion: 'none'
-    };
-
-    const framingDesc = adv.framing === 'full-body' ? "lấy toàn thân (full body shot)" : 
-                       adv.framing === 'close-up' ? "chụp cận mặt (extreme close-up)" : 
-                       "chụp chân dung từ ngực trở lên (waist-up portrait)";
-
-    const companionDesc = adv.companion === 'male' ? "Thêm một người nam (AI companion) đứng bên cạnh chủ thể, mặc áo dài cùng tông màu, tạo dáng thân thiện." :
-                         adv.companion === 'female' ? "Thêm một người nữ (AI companion) đứng bên cạnh chủ thể, mặc áo dài cùng tông màu, tạo dáng duyên dáng." :
+    const companionDesc = advanced.companion === 'male' ? "Thêm một người nam AI đứng cạnh tạo dáng thân mật." :
+                         advanced.companion === 'female' ? "Thêm một người nữ AI đứng cạnh tạo dáng duyên dáng." :
                          "";
 
-    const subjectDescription = subjectType === 'single'
-      ? `Tập trung vào 1 người duy nhất từ ảnh gốc, ${framingDesc}.`
-      : `Giữ toàn bộ các thành viên trong ảnh gốc, ${framingDesc}, sắp xếp bố cục gia đình/nhóm hài hòa trong vườn hoa.`;
+    const mergeInstruction = advanced.isMergeMode 
+      ? "HÃY KẾT HỢP TẤT CẢ NHÂN VẬT TỪ CÁC ẢNH GỐC VÀO TRONG CÙNG MỘT BỨC ẢNH DUY NHẤT. Tạo thành một tấm hình kỷ niệm gia đình/nhóm bạn sum vầy."
+      : "Giữ nguyên nhân vật từ ảnh gốc và đặt vào bối cảnh mới.";
 
     const prompt = `
-      Hãy biến đổi ảnh này thành một bức ảnh nghệ thuật đón Tết Việt Nam đẳng cấp.
+      Nhiệm vụ: Biến đổi ảnh thành tác phẩm nhiếp ảnh Tết chuyên nghiệp.
       BỐI CẢNH: Một ${flowerDescription}.
-      GÓC CHỤP & THÔNG SỐ:
-      - Góc chụp: ${framingDesc}.
-      - Sử dụng máy ảnh ${adv.cameraModel} với ống kính ${adv.focalLength}.
-      - Khẩu độ ${adv.aperture} tạo hiệu ứng xóa phông (bokeh) mịt mù nghệ thuật.
-      - ${subjectDescription}
+      CHẾ ĐỘ XỬ LÝ: ${mergeInstruction}
+      
+      THÔNG SỐ MÁY ẢNH (CAMERA SPECS):
+      - Body: ${advanced.cameraModel}
+      - Lens: ${advanced.focalLength}
+      - Aperture: ${advanced.aperture} (Xóa phông mượt mà, tạo hiệu ứng bokeh hình tròn lung linh phía sau).
+      - Framing: ${framingDesc}.
+      - Lighting: ${advanced.lighting} (Ánh sáng tự nhiên, ấm áp, tạo khối cho khuôn mặt).
+
+      YÊU CẦU NHÂN VẬT & TRANG PHỤC:
+      - Trang phục: ${advanced.shirtColor}, phong cách ${advanced.style}.
+      - Màu da: ${advanced.skinColor}.
+      - Màu tóc: ${advanced.hairColor}.
+      - Cảm xúc: ${advanced.emotion} (thể hiện rõ trên nét mặt).
       - ${companionDesc}
       
-      YÊU CẦU NGOẠI HÌNH & TRANG PHỤC:
-      - Nhân vật mặc ${adv.shirtColor} với phong cách ${adv.style}.
-      - Màu da chủ thể: ${adv.skinColor}.
-      - Màu tóc chủ thể: ${adv.hairColor}.
-      - Cảm xúc của nhân vật: ${adv.emotion}.
-      - Giữ nguyên đường nét cốt lõi của người trong ảnh gốc nhưng nâng cấp để trông chuyên nghiệp hơn.
-      
-      CHI TIẾT BỔ SUNG:
-      - Ánh sáng: ${randomVar}.
-      - Không khí Tết rực rỡ, ấm áp, đậm chất truyền thống Việt Nam.
-      - Chất lượng: 4k, cinematic, cực kỳ sắc nét ở chủ thể.
-      - ${colorsDescription}
+      YÊU CẦU KỸ THUẬT:
+      - Giữ nguyên đặc điểm nhận dạng khuôn mặt từ các ảnh nguồn.
+      - Chất lượng: 8k, cực kỳ chi tiết, độ tương phản tốt, màu sắc Tết Việt Nam truyền thống.
+      - Bố cục: Nghệ thuật, cân đối.
     `;
 
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
       contents: {
         parts: [
-          {
-            inlineData: {
-              data: dataOnly,
-              mimeType: mimeType,
-            },
-          },
-          {
-            text: prompt
-          },
+          ...imageParts,
+          { text: prompt },
         ],
       },
       config: {
         imageConfig: {
-          aspectRatio: adv.framing === 'full-body' ? "9:16" : "3:4"
+          aspectRatio: advanced.framing === 'full-body' ? "9:16" : "3:4"
         }
       }
     });

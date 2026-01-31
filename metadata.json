@@ -1,0 +1,7 @@
+{
+  "name": "Tết Photo Transformer",
+  "description": "Biến ảnh của bạn thành những tấm ảnh Tết nghệ thuật trong vườn đào với hiệu ứng xoá phông chuyên nghiệp bằng công nghệ AI Gemini 2.5 Flash Image.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
